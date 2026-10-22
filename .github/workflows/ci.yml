@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     strategy:
@@ -71,6 +74,18 @@ jobs:
           set +e
           java -jar target/schemaevo.jar check --format avro --mode BACKWARD_TRANSITIVE \
             --history examples/avro/orders-breaking
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "expected exit code 1, got $code" >&2
+            exit 1
+          fi
+
+      - name: "Positional files, as documented in the README (expect exit 1)"
+        run: |
+          set +e
+          java -jar target/schemaevo.jar check --format avro --mode BACKWARD \
+            examples/avro/orders-breaking/v2.avsc examples/avro/orders-breaking/v3.avsc
           code=$?
           set -e
           if [ "$code" -ne 1 ]; then
