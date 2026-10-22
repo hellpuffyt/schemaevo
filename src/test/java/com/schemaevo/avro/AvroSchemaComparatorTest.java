@@ -264,16 +264,58 @@ class AvroSchemaComparatorTest {
     assertThat(errors(findings)).isEmpty();
   }
 
+  // Expected value changed from "incompatible" during the production-readiness audit: the Avro
+  // specification matches named types by their unqualified name during schema resolution, and
+  // Avro's own SchemaCompatibility agrees (see AvroReferenceAgreementTest).
   @Test
-  void namespaceChangeWithoutAlias_isIncompatible() {
+  void namespaceOnlyChangeWithoutAlias_isCompatible() {
     Schema reader =
         schema("{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"new.ns\",\"fields\":[]}");
     Schema writer =
         schema("{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"old.ns\",\"fields\":[]}");
 
     List<Finding> findings = comparator.compare(reader, writer, Direction.BACKWARD);
+    assertThat(errors(findings)).isEmpty();
+  }
+
+  @Test
+  void recordRenameAcrossNamespaces_isStillIncompatible() {
+    Schema reader =
+        schema("{\"type\":\"record\",\"name\":\"S\",\"namespace\":\"new.ns\",\"fields\":[]}");
+    Schema writer =
+        schema("{\"type\":\"record\",\"name\":\"R\",\"namespace\":\"old.ns\",\"fields\":[]}");
+
+    List<Finding> findings = comparator.compare(reader, writer, Direction.BACKWARD);
     assertThat(errors(findings)).hasSize(1);
     assertThat(errors(findings).get(0).ruleId()).isEqualTo("avro.record.name-mismatch");
+  }
+
+  // Regression: a record that refers to itself through an array or map used to recurse forever
+  // (StackOverflowError) because the recursion guard was keyed on the ever-growing path.
+  @Test
+  void recursiveRecordThroughArray_terminatesAndReportsNestedBreak() {
+    Schema reader =
+        schema(
+            "{\"type\":\"record\",\"name\":\"T\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},"
+                + "{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"T\"}}]}");
+    Schema writer =
+        schema(
+            "{\"type\":\"record\",\"name\":\"T\",\"fields\":[{\"name\":\"v\",\"type\":\"long\"},"
+                + "{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"T\"}}]}");
+
+    assertThat(errors(comparator.compare(reader, reader, Direction.BACKWARD))).isEmpty();
+    List<Finding> findings = comparator.compare(reader, writer, Direction.BACKWARD);
+    assertThat(errors(findings)).hasSize(1);
+    assertThat(errors(findings).get(0).path()).isEqualTo("#/fields/v");
+  }
+
+  @Test
+  void recursiveRecordThroughMap_terminates() {
+    Schema tree =
+        schema(
+            "{\"type\":\"record\",\"name\":\"T\",\"fields\":["
+                + "{\"name\":\"kids\",\"type\":{\"type\":\"map\",\"values\":\"T\"}}]}");
+    assertThat(errors(comparator.compare(tree, tree, Direction.FORWARD))).isEmpty();
   }
 
   @Test

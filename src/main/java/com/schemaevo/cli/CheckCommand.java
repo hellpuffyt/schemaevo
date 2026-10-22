@@ -29,10 +29,12 @@ import picocli.CommandLine.Parameters;
  * every break in reader/writer terms.
  */
 @Command(
-    name = "schemaevo",
+    name = "check",
     mixinStandardHelpOptions = true,
     version = "schemaevo 1.0.0",
-    description = "Checks Avro and JSON Schema evolution compatibility.")
+    description =
+        "Checks a candidate schema against prior versions. Exit codes: 0 compatible,"
+            + " 1 incompatible, 2 usage or schema error.")
 public final class CheckCommand implements Callable<Integer> {
 
   private static final Pattern TRAILING_NUMBER = Pattern.compile("(\\d+)(?!.*\\d)");
@@ -107,6 +109,12 @@ public final class CheckCommand implements Callable<Integer> {
   }
 
   private List<Path> resolveFiles() throws IOException {
+    if (historyDir != null && !files.isEmpty()) {
+      throw new SchemaEvoException(
+          "use either --history <dir> or schema files, not both (got "
+              + files.size()
+              + " file(s))");
+    }
     if (historyDir != null) {
       if (!Files.isDirectory(historyDir)) {
         throw new SchemaEvoException("--history path is not a directory: " + historyDir);

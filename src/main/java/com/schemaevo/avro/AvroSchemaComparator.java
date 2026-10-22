@@ -49,12 +49,6 @@ public final class AvroSchemaComparator {
       Direction direction,
       List<Finding> out,
       Set<String> seen) {
-    // Guard against infinite recursion on recursive record definitions.
-    String pairKey = path + "::" + identity(reader) + "::" + identity(writer);
-    if (!seen.add(pairKey)) {
-      return;
-    }
-
     if (reader.getType() == Type.UNION || writer.getType() == Type.UNION) {
       compareUnion(reader, writer, path, direction, out, seen);
       return;
@@ -122,6 +116,28 @@ public final class AvroSchemaComparator {
   }
 
   private void compareRecord(
+      Schema reader,
+      Schema writer,
+      String path,
+      Direction direction,
+      List<Finding> out,
+      Set<String> seen) {
+    // Recursive types: a reader/writer record pair that is already being compared further up the
+    // stack is assumed compatible here; any real mismatch is reported where the pair was entered.
+    // This mirrors Avro's own SchemaCompatibility, and the key deliberately excludes the path,
+    // which grows without bound when a record refers to itself through an array or map.
+    String pairKey = reader.getFullName() + "<-" + writer.getFullName();
+    if (!seen.add(pairKey)) {
+      return;
+    }
+    try {
+      compareRecordBody(reader, writer, path, direction, out, seen);
+    } finally {
+      seen.remove(pairKey);
+    }
+  }
+
+  private void compareRecordBody(
       Schema reader,
       Schema writer,
       String path,
@@ -354,11 +370,13 @@ public final class AvroSchemaComparator {
   }
 
   /**
-   * Two named schemas match if their full names are equal, or the reader declares an alias for the
-   * writer's name.
+   * Two named schemas match if their unqualified names are equal, or the reader declares an alias
+   * for the writer's full name. The Avro specification's schema resolution rules match records,
+   * enums and fixed types by <em>unqualified</em> name, and Avro's own {@code SchemaCompatibility}
+   * does the same, so a namespace-only change is not a break.
    */
   private boolean namesMatch(Schema reader, Schema writer) {
-    if (reader.getFullName().equals(writer.getFullName())) {
+    if (reader.getName().equals(writer.getName())) {
       return true;
     }
     return reader.getAliases().contains(writer.getFullName());
@@ -368,13 +386,6 @@ public final class AvroSchemaComparator {
     return switch (schema.getType()) {
       case RECORD, ENUM, FIXED -> schema.getType().getName() + " '" + schema.getFullName() + "'";
       default -> schema.getType().getName();
-    };
-  }
-
-  private String identity(Schema schema) {
-    return switch (schema.getType()) {
-      case RECORD, ENUM, FIXED -> schema.getFullName();
-      default -> schema.toString();
     };
   }
 
