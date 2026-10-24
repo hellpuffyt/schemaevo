@@ -47,12 +47,35 @@ public final class JsonSchemaComparator {
   private void checkType(
       JsonNode validating, JsonNode data, String path, Direction direction, List<Finding> out) {
     Set<String> validatingTypes = typesOf(validating);
+    if (validatingTypes.isEmpty()) {
+      return;
+    }
     Set<String> dataTypes = typesOf(data);
-    if (validatingTypes.isEmpty() || dataTypes.isEmpty()) {
+    if (dataTypes.isEmpty()) {
+      dataTypes = typesOfEnumValues(data);
+    }
+    if (dataTypes.isEmpty()) {
+      // The data-producing schema places no constraint on the type, so it can produce values of
+      // any type; a validating schema that restricts the type rejects some of them.
+      out.add(
+          error(
+              direction,
+              JsonSchemaRuleIds.TYPE_UNCONSTRAINED_SOURCE,
+              path,
+              validatingLabel(direction)
+                  + " only accepts type(s) "
+                  + validatingTypes
+                  + " at "
+                  + path
+                  + ", but "
+                  + dataLabel(direction)
+                  + " places no constraint on the type there, so it may hold any type.",
+              "declare the same 'type' on the data-producing schema, or drop the 'type'"
+                  + " constraint from the validating schema"));
       return;
     }
     for (String dataType : dataTypes) {
-      if (!validatingTypes.contains(dataType)) {
+      if (!accepts(validatingTypes, dataType)) {
         out.add(
             error(
                 direction,
@@ -334,6 +357,39 @@ public final class JsonSchemaComparator {
       return;
     }
     compare(validatingItems, dataItems, path + "/items", direction, out);
+  }
+
+  /** JSON Schema's "number" type also accepts every "integer". */
+  private static boolean accepts(Set<String> validatingTypes, String dataType) {
+    return validatingTypes.contains(dataType)
+        || ("integer".equals(dataType) && validatingTypes.contains("number"));
+  }
+
+  /** The JSON types of the values in an {@code enum}, or empty if there is no enum. */
+  private static Set<String> typesOfEnumValues(JsonNode schema) {
+    JsonNode values = schema.get("enum");
+    if (values == null || !values.isArray()) {
+      return Set.of();
+    }
+    Set<String> types = new HashSet<>();
+    for (JsonNode value : values) {
+      if (value.isIntegralNumber()) {
+        types.add("integer");
+      } else if (value.isNumber()) {
+        types.add("number");
+      } else if (value.isTextual()) {
+        types.add("string");
+      } else if (value.isBoolean()) {
+        types.add("boolean");
+      } else if (value.isNull()) {
+        types.add("null");
+      } else if (value.isArray()) {
+        types.add("array");
+      } else {
+        types.add("object");
+      }
+    }
+    return types;
   }
 
   private Set<String> typesOf(JsonNode schema) {

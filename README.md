@@ -71,7 +71,7 @@ swapped.
 | Union: widen (add a branch) | No (reader side) | N/A | An unused extra reader branch is harmless. |
 | Record/field/enum/fixed rename without alias | Yes | Yes | Add the old fully-qualified name (or field name) to `aliases`. |
 | Record/field/enum/fixed rename **with** alias | No | No | The alias reconciles the old and new names during resolution. |
-| Namespace change without alias | Yes | Yes | Namespace is part of the full name; same alias rule applies. |
+| Namespace-only change (same unqualified name) | No | No | The Avro specification matches named types by their *unqualified* name during resolution, and Avro's own `SchemaCompatibility` agrees. Renaming the type itself still needs an alias. |
 | `fixed` size change | Yes | Yes | Sizes must match exactly; there is no promotion for `fixed`. |
 
 ### JSON Schema
@@ -82,6 +82,8 @@ swapped.
 | Remove a `required` property | No | No | Strictly loosens the schema. |
 | Narrow `type` (e.g. drop an allowed type) | Yes | No | Old data of the dropped type would now fail validation. |
 | Loosen `type` (e.g. add an allowed type) | No | Yes | New data of the added type would fail the old, narrower schema. |
+| Add a `type` where there was none | Yes | No | The untyped side could produce any type. An untyped `enum` is judged by the types of its values. |
+| `integer` data against a `number` schema | No | — | Every integer is a number; the reverse (`number` data, `integer` schema) is a break. |
 | Narrow `enum` (remove a value) | Yes | No | Old data may have used the removed value. |
 | Widen `enum` (add a value) | No | Yes | New data may use the new value, which the old schema rejects. |
 | Add an `enum` over a previously unconstrained field | Yes | Yes | Neither side can assume the other's values fit the new set. |
@@ -114,7 +116,10 @@ com.schemaevo.cli             Picocli-based command line entry point.
 `org.apache.avro:avro` is used to *parse* `.avsc` files into a `Schema` object
 model; every compatibility rule and every explanation is implemented in this
 project rather than reused from Avro's own (much terser) `SchemaCompatibility`
-class. JSON Schema is parsed with Jackson into a plain `JsonNode` tree and
+class. The test suite cross-checks every verdict against Avro's reference
+implementation (`SchemaCompatibility` for single reader/writer pairs and
+`SchemaValidatorBuilder` for every mode, transitive or not) — see
+`AvroReferenceAgreementTest`. JSON Schema is parsed with Jackson into a plain `JsonNode` tree and
 compared with a purpose-built, non-spec-complete comparator covering the
 constraints listed above.
 
@@ -201,12 +206,29 @@ breaking and non-breaking direction, transitive checks across three versions,
 and malformed-schema handling), Spotless formatting checks, and SpotBugs
 static analysis.
 
+## Limitations
+
+- JSON Schema support is deliberately partial: only the keywords in the table
+  above are compared. `$ref`, `allOf`/`anyOf`/`oneOf`/`not`, `const`,
+  `pattern`, `format`, `exclusiveMinimum`/`exclusiveMaximum`, `multipleOf`,
+  tuple-form `items`, `minItems`/`maxItems` and `patternProperties` are
+  ignored, so a change that only touches them is reported as compatible.
+- Adding a new optional property to an *open* JSON Schema object (one that
+  does not set `additionalProperties: false`) is reported as compatible, even
+  though old data could in theory already carry that property with a
+  different type.
+- Avro logical types are ignored, as they are by Avro's own compatibility
+  check: only the underlying types are compared.
+- Avro's library logs through SLF4J; with no SLF4J provider on the class path
+  it prints a three-line `SLF4J(W): No SLF4J providers were found` notice on
+  stderr. It is harmless and does not affect the exit code.
+
 ## Security
 
 `schemaevo` only reads local files you point it at and never makes network
 calls. Schema parsing errors are caught and reported as a clear message
-(exit code `2`), not a raw stack trace. If you find a security issue, please
-open a private report rather than a public issue.
+(exit code `2`), not a raw stack trace. See [SECURITY.md](SECURITY.md) for how
+to report a vulnerability privately.
 
 ## License
 

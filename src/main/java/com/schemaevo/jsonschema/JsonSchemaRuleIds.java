@@ -4,6 +4,7 @@ package com.schemaevo.jsonschema;
 final class JsonSchemaRuleIds {
 
   static final String TYPE_NOT_ACCEPTED = "jsonschema.type.not-accepted";
+  static final String TYPE_UNCONSTRAINED_SOURCE = "jsonschema.type.unconstrained-source";
   static final String REQUIRED_NOT_GUARANTEED = "jsonschema.required.not-guaranteed";
   static final String ADDITIONAL_PROPERTIES_CLOSED = "jsonschema.additional-properties.closed";
   static final String ENUM_VALUE_NOT_ALLOWED = "jsonschema.enum.value-not-allowed";

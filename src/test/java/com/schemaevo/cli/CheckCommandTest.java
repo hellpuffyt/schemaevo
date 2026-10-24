@@ -112,4 +112,56 @@ class CheckCommandTest {
     String output = captured.toString(StandardCharsets.UTF_8);
     assertThat(output).contains("\"compatible\" : false");
   }
+
+  private int runMain(String... args) {
+    return Main.commandLine().execute(args);
+  }
+
+  // Regression: the README documents 'schemaevo check ...', but 'check' used to be parsed as a
+  // schema file name, so every documented positional example failed with exit code 2.
+  @Test
+  void documentedCheckSubcommand_works() throws IOException {
+    Path v1 = write("v1.avsc", V1);
+    Path ok = write("v2.avsc", V2_COMPATIBLE);
+    Path bad = write("v3.avsc", V2_BREAKING);
+
+    assertThat(
+            runMain(
+                "check", "--format", "avro", "--mode", "BACKWARD", v1.toString(), ok.toString()))
+        .isEqualTo(0);
+    assertThat(runMain("check", "--format", "avro", v1.toString(), bad.toString())).isEqualTo(1);
+    assertThat(runMain("--help")).isEqualTo(0);
+    assertThat(runMain("check", "--help")).isEqualTo(0);
+  }
+
+  @Test
+  void missingSubcommand_exitsTwo() throws IOException {
+    Path v1 = write("v1.avsc", V1);
+    Path v2 = write("v2.avsc", V2_COMPATIBLE);
+    assertThat(runMain("--format", "avro", v1.toString(), v2.toString())).isEqualTo(2);
+    assertThat(runMain()).isEqualTo(2);
+  }
+
+  // Regression: positional files passed together with --history used to be silently ignored.
+  @Test
+  void historyAndPositionalFilesTogether_exitTwo() throws IOException {
+    Path dir = Files.createDirectory(tempDir.resolve("hist"));
+    Files.writeString(dir.resolve("v1.avsc"), V1, StandardCharsets.UTF_8);
+    Files.writeString(dir.resolve("v2.avsc"), V2_COMPATIBLE, StandardCharsets.UTF_8);
+    Path extra = write("v3.avsc", V2_BREAKING);
+
+    assertThat(runMain("check", "--format", "avro", "--history", dir.toString(), extra.toString()))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void recursiveAvroSchema_doesNotCrash() throws IOException {
+    String tree =
+        "{\"type\":\"record\",\"name\":\"T\",\"fields\":[{\"name\":\"v\",\"type\":\"int\"},"
+            + "{\"name\":\"kids\",\"type\":{\"type\":\"array\",\"items\":\"T\"}}]}";
+    Path v1 = write("t1.avsc", tree);
+    Path v2 = write("t2.avsc", tree);
+    assertThat(runMain("check", "--format", "avro", "--mode", "FULL", v1.toString(), v2.toString()))
+        .isEqualTo(0);
+  }
 }

@@ -329,4 +329,46 @@ class JsonSchemaComparatorTest {
 
     assertThat(errors(comparator.compare(newSchema, oldSchema, Direction.BACKWARD))).isEmpty();
   }
+
+  // Regression: a validating schema that restricts 'type' where the data-producing schema had no
+  // type constraint at all used to be reported as compatible.
+  @Test
+  void typeAddedOverUnconstrainedProperty_isBreaking() {
+    JsonNode oldSchema = node("{\"type\":\"object\",\"properties\":{\"a\":{}}}");
+    JsonNode newSchema = node("{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\"}}}");
+
+    List<Finding> backward = errors(comparator.compare(newSchema, oldSchema, Direction.BACKWARD));
+    assertThat(backward).hasSize(1);
+    assertThat(backward.get(0).ruleId()).isEqualTo("jsonschema.type.unconstrained-source");
+    assertThat(errors(comparator.compare(oldSchema, newSchema, Direction.FORWARD))).isEmpty();
+  }
+
+  @Test
+  void untypedEnumSourceIsJudgedByItsValues() {
+    JsonNode data = node("{\"enum\":[\"a\",\"b\"]}");
+    assertThat(errors(comparator.compare(node("{\"type\":\"string\"}"), data, Direction.BACKWARD)))
+        .isEmpty();
+    assertThat(errors(comparator.compare(node("{\"type\":\"integer\"}"), data, Direction.BACKWARD)))
+        .hasSize(1);
+  }
+
+  // Regression: "integer" data validated by a "number" schema used to be reported as a break,
+  // although every integer is a number.
+  @Test
+  void integerDataIsAcceptedByNumberSchema() {
+    assertThat(
+            errors(
+                comparator.compare(
+                    node("{\"type\":\"number\"}"),
+                    node("{\"type\":\"integer\"}"),
+                    Direction.BACKWARD)))
+        .isEmpty();
+    assertThat(
+            errors(
+                comparator.compare(
+                    node("{\"type\":\"integer\"}"),
+                    node("{\"type\":\"number\"}"),
+                    Direction.BACKWARD)))
+        .hasSize(1);
+  }
 }
