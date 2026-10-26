@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="t d">
+  <title id="t">schemaevo check flow</title>
+  <desc id="d">CheckCommand takes prior schema files and a candidate, or a --history directory ordered by trailing number. The chosen CompatibilityChecker (Avro or JSON Schema) turns the mode into reader/writer pairs: BACKWARD reads old data with the new schema, FORWARD reads new data with the old schema, FULL does both, transitive modes pair the candidate with every prior version. AvroSchemaComparator or JsonSchemaComparator walks each pair and emits Findings with a rule id, path, explanation and fix. The result is rendered as a human or JSON report with exit code 0, 1 or 2.</desc>
+  <rect width="1200" height="470" fill="#0C0D0D"/>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#A3AAA6"/>
+    </marker>
+  </defs>
+  <text x="40" y="44" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15" fill="#EEEAE2">schemaevo check</text>
+  <text x="200" y="44" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" fill="#A3AAA6">every verdict is a reader schema resolving data from a writer schema</text>
+
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+    <rect x="40" y="90" width="200" height="150" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="118" fill="#EEEAE2">CheckCommand</text>
+    <text x="56" y="142" fill="#A3AAA6">v1 v2 ... candidate</text>
+    <text x="56" y="164" fill="#A3AAA6">or --history dir</text>
+    <text x="56" y="186" fill="#A3AAA6">(trailing number)</text>
+    <text x="56" y="214" fill="#A3AAA6">--format --mode</text>
+
+    <rect x="280" y="90" width="250" height="150" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="296" y="118" fill="#EEEAE2">CompatibilityChecker</text>
+    <text x="296" y="142" fill="#A3AAA6">Avro / JsonSchema</text>
+    <text x="296" y="168" fill="#A3AAA6">mode -&gt; pairs + direction</text>
+    <text x="296" y="190" fill="#A3AAA6">last prior, or every</text>
+    <text x="296" y="212" fill="#A3AAA6">prior if *_TRANSITIVE</text>
+
+    <rect x="570" y="90" width="250" height="150" rx="6" fill="#17191A" stroke="#3FBF8A"/>
+    <text x="586" y="118" fill="#EEEAE2">Comparator</text>
+    <text x="586" y="142" fill="#A3AAA6">AvroSchemaComparator</text>
+    <text x="586" y="164" fill="#A3AAA6">JsonSchemaComparator</text>
+    <text x="586" y="190" fill="#A3AAA6">compare(reader, writer,</text>
+    <text x="586" y="212" fill="#A3AAA6">        direction)</text>
+
+    <rect x="860" y="90" width="300" height="150" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="876" y="118" fill="#EEEAE2">Finding</text>
+    <text x="876" y="142" fill="#A3AAA6">severity  ERROR | WARNING | INFO</text>
+    <text x="876" y="164" fill="#A3AAA6">ruleId    avro.record.field-...</text>
+    <text x="876" y="186" fill="#A3AAA6">path      #/fields/priority</text>
+    <text x="876" y="208" fill="#A3AAA6">message + suggested fix</text>
+
+    <rect x="860" y="290" width="300" height="130" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="876" y="318" fill="#EEEAE2">report</text>
+    <text x="876" y="342" fill="#A3AAA6">HumanReportRenderer</text>
+    <text x="876" y="364" fill="#A3AAA6">JsonReportRenderer (--json)</text>
+    <text x="876" y="394" fill="#A3AAA6">exit 0 ok | 1 break | 2 error</text>
+
+    <!-- mode panel -->
+    <rect x="40" y="290" width="780" height="130" rx="6" fill="#17191A" stroke="#2A2E2D"/>
+    <text x="56" y="318" fill="#EEEAE2">mode</text>
+    <text x="200" y="318" fill="#EEEAE2">reader</text>
+    <text x="360" y="318" fill="#EEEAE2">writer</text>
+    <text x="520" y="318" fill="#EEEAE2">question</text>
+    <text x="56" y="346" fill="#A3AAA6">BACKWARD</text>
+    <text x="200" y="346" fill="#A3AAA6">candidate</text>
+    <text x="360" y="346" fill="#A3AAA6">prior</text>
+    <text x="520" y="346" fill="#A3AAA6">new consumer, old data</text>
+    <text x="56" y="370" fill="#A3AAA6">FORWARD</text>
+    <text x="200" y="370" fill="#A3AAA6">prior</text>
+    <text x="360" y="370" fill="#A3AAA6">candidate</text>
+    <text x="520" y="370" fill="#A3AAA6">old consumer, new data</text>
+    <text x="56" y="394" fill="#A3AAA6">FULL</text>
+    <text x="200" y="394" fill="#A3AAA6">both directions</text>
+  </g>
+
+  <g stroke="#A3AAA6" stroke-width="1.5" fill="none" marker-end="url(#a)">
+    <path d="M240 165 H276"/>
+    <path d="M530 165 H566"/>
+    <path d="M820 165 H856"/>
+    <path d="M1010 240 V286"/>
+  </g>
+  <text x="40" y="450" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="13" fill="#A3AAA6">Avro files are parsed with org.apache.avro, JSON Schema with Jackson; the rules themselves are implemented in the comparators.</text>
+</svg>
